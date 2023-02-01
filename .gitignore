@@ -3,3 +3,5 @@ venv/
 env/
 parser.out
 parsetab.py
+/scheme_parser/.cmi
+/.cmi

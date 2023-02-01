@@ -36,7 +36,7 @@ def new_code(code):
     new_code = Code(code=code)
     s.add(new_code)
     s.commit()
-    print "New code added to database."
+    print("New code added to database.")
     return new_code.id
 
 ### for initalizing database tables
