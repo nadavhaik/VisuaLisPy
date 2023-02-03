@@ -80,7 +80,7 @@ $(document).ready(function(){
             // data is not yet defined when ajax tries to set the callback 
             // and we attempt to run drawTree
         ).fail(function(){
-            failMessage = "Sorry, the given program is invalid or may contain an expression currently unsupported by VisuaLisPy. :(";
+            failMessage = "ERROR: Parsing failed!\nYour program is probably invalid.";
             messageArea = document.getElementById("message_display");
             messageArea.innerHTML = failMessage;
         });
