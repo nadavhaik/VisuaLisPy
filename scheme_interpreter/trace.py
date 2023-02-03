@@ -198,7 +198,7 @@ def trace_exprs(exprs: list[Expr]) -> NodeType:
 
 
 def trace_strings(strings: list[str]) -> NodeType:
-    return make_node("OcamlList", *strings)
+    return make_node("OcamlList", *[f'"{string}"' for string in strings])
 
 
 def trace_exp(exp: Expr) -> NodeType:
