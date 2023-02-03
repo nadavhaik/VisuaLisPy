@@ -13,9 +13,6 @@ class ParsingMode(Enum):
     TAG_PARSER = 1
 
 
-DEFAULT_PARSING_MODE = ParsingMode.READER
-
-
 class Env(dict):
     # Env is a subclass of dict.
     # An environment is a dictionary of {'var': val} pairs with an outer Env.
@@ -236,7 +233,7 @@ global_env = add_globals(Env())
 # # The Lispy tokens are parentheses, symbols (such as set! or x), and numbers (such as 2).
 
 
-def format_json(user_input):
+def format_json(user_input, parsing_mode: ParsingMode = ParsingMode.READER):
     # prepare tracing structures
     # global expression_trace
     global_env_for_json_conversion = {}
@@ -265,14 +262,14 @@ def format_json(user_input):
         # trace is a list of dictionaries
         "trace": []
     }
-    if DEFAULT_PARSING_MODE == ParsingMode.READER:
+    if parsing_mode == ParsingMode.READER:
         expressions = sexps_parse(user_input)
         expression_trace = [trace_line_sexp(sexp) for sexp in expressions]
-    elif DEFAULT_PARSING_MODE == ParsingMode.TAG_PARSER:
+    elif parsing_mode == ParsingMode.TAG_PARSER:
         expressions = exprs_parse(user_input)
         expression_trace = [trace_line_exp(exp) for exp in expressions]
     else:
-        raise ValueError(f"Unknown parsing mode: {DEFAULT_PARSING_MODE}")
+        raise ValueError(f"Unknown parsing mode: {parsing_mode}")
 
     json_output["trace"].append(dict(global_env=global_env_for_json_conversion))
     json_output["trace"].append(dict(expression_trace=expression_trace))

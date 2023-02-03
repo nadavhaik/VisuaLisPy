@@ -1,6 +1,8 @@
 div.container {
     margin:0px auto;
-    width: 200px;
+    width: 300000000px;
     text-align:left;
     padding:35px;
+    right:0;
+    overflow: visible;
 }

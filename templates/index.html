@@ -2,11 +2,12 @@
 {% block css %}
 <style>
     div#tree {
-      padding: 0px;
-      float:left;
-      width: 600px;
-      margin: -20px 0px 0px -100px;
-      border: 0px;
+        padding: 0px;
+        float:left;
+        width: 30000px;
+        margin: -20px 0px 0px -100px;
+        border: 0px;
+        overflow: visible;
     }
 
     /*tree CSS*/
@@ -62,8 +63,13 @@
 
   <form id="code_submission" method="POST" action="/get_json" onsubmit="return false;">
     <textarea id="user_input" class="form-control" name="user_input" placeholder="Enter Scheme program here." cols="20" rows="5">{{code}}</textarea>
+      <select id="parser-type" name="parser-type">
+      <option value="READER">Reader</option>
+      <option value="TAG_PARSER">Tag Parser</option>
+    </select>
     </p>
     <input type="submit" class="btn btn-default" id="form_submit" value="Render Abstract Syntax Tree" onclick="return false;">
+
     <button class="btn btn-default" id="clear_program">Clear</button>
     <button class="btn btn-default" id="save_program">Save</button>
 
@@ -92,28 +98,6 @@
         </ul>
       </div>
 
-     <div class="btn-group">
-        <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
-          JavaScript Examples
-          <span class="caret"></span>
-        </button>
-
-        <ul class="dropdown-menu" role="menu" aria-labelledby="dropdownMenu1">
-          <li role="presentation">
-            <a role="menuitem" tabindex="-1" href="/get_db_code/5">area</a>
-          </li>
-          <li role="presentation">
-            <a role="menuitem" tabindex="-1" href="/get_db_code/6">factorial</a>
-          </li>
-          <li role="presentation">
-            <a role="menuitem" tabindex="-1" href="/get_db_code/7">fibonacci</a>
-          </li>
-          <li role="presentation" class="divider"></li>
-          <li role="presentation">
-            <a role="menuitem" tabindex="-1" href="/get_db_code/8">math</a>
-          </li>
-        </ul>
-      </div>
 
     </div>
   </div>

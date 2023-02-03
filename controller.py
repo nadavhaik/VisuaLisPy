@@ -21,12 +21,13 @@ def code_submitted():
     # return JSON to ajax call -- code input by user
     print(request.form.get("user_input"))
     user_input = request.form.get("user_input").strip()
+    parsing_mode = lis.ParsingMode[request.form.get("parser-type")]
 
     if not user_input:
         print('NO USER INPUT')
         return None
 
-    json_object = lis.format_json(user_input)
+    json_object = lis.format_json(user_input, parsing_mode)
     print(json_object)
 
     return json_object
