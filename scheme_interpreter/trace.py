@@ -157,7 +157,7 @@ def trace_lambda_kind(lambda_kind: LambdaKind):
 
 
 def trace_scm_const(const: ScmConst):
-    return make_node("ScmConst", make_node(trace_sexp(const.sexpr)))
+    return make_node("ScmConst", trace_sexp(const.sexpr))
 
 
 def trace_var_get(var_get: ScmVarGet):
