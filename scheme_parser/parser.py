@@ -77,7 +77,7 @@ def convert_sexp(ocaml_sexp) -> SExp:
         case 'ScmNil':
             return ScmNil()
         case 'ScmBoolean':
-            return convert_boolean(ocaml_sexp.f0)
+            return convert_boolean(ocaml_sexp)
         case 'ScmNumber':
             return convert_number(ocaml_sexp.f0)
         case 'ScmChar':
@@ -200,6 +200,6 @@ def exprs_parse(string: str) -> list[Expr]:
 
 # x = sexps_parse("(car (cons 1 2)) (define x 2)")
 # print(x)
-print(sexps_parse("(letrec ((x 2) (y 3)) (+ x y))"))
-print(sexps_parse("(lambda (x y z) x)"))
+# print(sexps_parse("(letrec ((x 2) (y 3)) (+ x y))"))
+# print(sexps_parse("(lambda (x y z) x)"))
 # print(exprs_parse("(car (cons 1 2))"))

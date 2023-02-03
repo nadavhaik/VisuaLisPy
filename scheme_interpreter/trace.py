@@ -1,7 +1,6 @@
 from dataclasses import asdict
 
-from scheme_types.types import ScmNil, ProperList, ScmVoid, ScmSymbol, ScmBoolean, ScmChar, ScmString, ScmNumber, \
-    ScmFloat, ScmVector, SExp, ScmPair
+from scheme_types.types import *
 from typing import TypeVar
 
 T = TypeVar("T")
@@ -11,6 +10,13 @@ T2 = TypeVar("T2")
 
 class NotSupportedError(Exception):
     pass
+
+
+NodeType = str | list["NodeType"]
+
+
+def make_node(parent: str, *children: NodeType) -> NodeType:
+    return [parent] + list(reversed(children))
 
 
 def car(exp: tuple[T1, T2]):
@@ -96,14 +102,11 @@ def trace_number(num: ScmNumber):
 
 
 def trace_vector(vec: ScmVector):
-    return ["ScmVec"] + list(reversed([trace_sexp(sexp) for sexp in vec]))
+    return make_node("ScmVec", *[trace_sexp(sexp) for sexp in vec])
 
 
 def trace_pair(pair: ScmPair):
-    # if is_proper_list(pair):
-    #     return ["Proper List"] + trace_vector(proper_list_to_python_list(pair))
-    # else:
-    return ["ScmPair", trace_sexp(cdr(pair)), trace_sexp(car(pair))]
+    return make_node("ScmPair", trace_sexp(car(pair)), trace_sexp(cdr(pair)))
 
 
 def trace_sexp(sexp: SExp):
@@ -129,23 +132,97 @@ def trace_sexp(sexp: SExp):
     raise ValueError(f"Could not trace: {sexp}")
 
 
-def trace_line_vec(vec: ScmVector):
-    if not isinstance(vec[0], ScmSymbol):
-        raise NotSupportedError(f"Cannot trace vector {vec}")
-    return {str(vec[0]): trace_sexp(vec)}
-
-
-def trace_line_pair(p: ScmPair):
-    if not isinstance(car(p), ScmSymbol):
-        return {"ScmPair": trace_sexp(p)}
-    else:
-        return {str(car(p)): trace_sexp(p)}
-
-
 def trace_line_sexp(sexp: SExp):
-    if isinstance(sexp, list):
-        return trace_line_vec(sexp)
-    if isinstance(sexp, tuple):
-        return trace_line_pair(sexp)
+    return {"ROOT": trace_sexp(sexp)}
 
-    raise NotSupportedError(f"Cannot trace line exp {sexp}")
+
+def trace_var(var: ScmVar):
+    return f"var {var.name}"
+
+
+def trace_lambda_simple(_: LambdaSimple):
+    return "Simple"
+
+
+def trace_lambda_opt(opt: LambdaOpt):
+    return f"Opt {opt.opt}"
+
+
+def trace_lambda_kind(lambda_kind: LambdaKind):
+    if isinstance(lambda_kind, LambdaSimple):
+        return trace_lambda_simple(lambda_kind)
+    if isinstance(lambda_kind, LambdaOpt):
+        return trace_lambda_opt(lambda_kind)
+    raise ValueError(f"Could not trace lambda kind: {lambda_kind}")
+
+
+def trace_scm_const(const: ScmConst):
+    return make_node("ScmConst", make_node(trace_sexp(const.sexpr)))
+
+
+def trace_var_get(var_get: ScmVarGet):
+    return make_node("ScmVarGet", make_node(trace_var(var_get.var)))
+
+
+def trace_scm_if(scm_if: ScmIf):
+    return make_node("ScmIf", trace_exp(scm_if.test), trace_exp(scm_if.dit), trace_exp(scm_if.dif))
+
+
+def trace_seq(seq: ScmSeq):
+    return make_node("ScmSeq", *[trace_exp(exp) for exp in seq.exprs])
+
+
+def trace_or(scm_or: ScmOr):
+    return make_node("ScmOr", *[trace_exp(exp) for exp in scm_or.exprs])
+
+
+def trace_var_set(var_set: ScmVarSet):
+    return make_node("ScmVarSet", trace_var(var_set.var), trace_exp(var_set.val))
+
+
+def trace_var_def(var_def: ScmVarDef):
+    return make_node("ScmVarDef", trace_var(var_def.var), trace_exp(var_def.val))
+
+
+def trace_lambda(scm_lambda: ScmLambda):
+    return make_node("ScmLambda", trace_strings(scm_lambda.params), trace_lambda_kind(scm_lambda.kind),
+                     trace_exp(scm_lambda.body))
+
+
+def trace_applic(applic: ScmApplic):
+    return make_node("ScmApplic", trace_exp(applic.applicative), trace_exprs(applic.params))
+
+
+def trace_exprs(exprs: list[Expr]) -> NodeType:
+    return make_node("OcamlList", *[trace_exp(exp) for exp in exprs])
+
+
+def trace_strings(strings: list[str]) -> NodeType:
+    return make_node("OcamlList", *strings)
+
+
+def trace_exp(exp: Expr) -> NodeType:
+    if isinstance(exp, ScmConst):
+        return trace_scm_const(exp)
+    if isinstance(exp, ScmVarGet):
+        return trace_var_get(exp)
+    if isinstance(exp, ScmIf):
+        return trace_scm_if(exp)
+    if isinstance(exp, ScmSeq):
+        return trace_seq(exp)
+    if isinstance(exp, ScmOr):
+        return trace_or(exp)
+    if isinstance(exp, ScmVarSet):
+        return trace_var_set(exp)
+    if isinstance(exp, ScmVarDef):
+        return trace_var_def(exp)
+    if isinstance(exp, ScmLambda):
+        return trace_lambda(exp)
+    if isinstance(exp, ScmApplic):
+        return trace_applic(exp)
+
+    raise ValueError(f"Could not trace exp: {exp}")
+
+
+def trace_line_exp(exp: Expr):
+    return {"ROOT": trace_exp(exp)}
