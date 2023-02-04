@@ -203,7 +203,7 @@ def convert_lexical_address(ocaml_lexical_address) -> LexicalAddress:
 
 # type var' = Var' of string * lexical_address;;
 def convert_scm_var_tag(ocaml_scm_var) -> ScmVarTag:
-    return ScmVarTag(ocaml_scm_var.f0.f0, ocaml_scm_var.f1)
+    return ScmVarTag(ocaml_scm_var.f0, convert_lexical_address(ocaml_scm_var.f1))
 
 
 convert_scm_const_tag = convert_scm_const
@@ -266,7 +266,7 @@ def convert_scm_applic_tag(ocaml_scm_applic) -> ScmApplicTag:
     #   | ScmApplic' of expr' * expr' list * app_kind;;
     return ScmApplicTag(convert_expr_tag(ocaml_scm_applic.f0),
                         [convert_expr_tag(param) for param in ocaml_scm_applic.f1],
-                        convert_app_kind(ocaml_scm_applic.f1))
+                        convert_app_kind(ocaml_scm_applic.f2))
 
 
 def convert_expr_tag(ocaml_exp) -> ExprTag:

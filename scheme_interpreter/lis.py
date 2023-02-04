@@ -3,14 +3,15 @@
 
 from abc import ABCMeta, abstractmethod
 from enum import Enum
-from scheme_interpreter.trace import trace_line_sexp, trace_line_exp
-from scheme_parser.parser import sexp_parse, sexps_parse, exprs_parse
+from scheme_interpreter.trace import trace_line_sexp, trace_line_exp, trace_line_exp_tag
+from scheme_parser.parser import sexp_parse, sexps_parse, exprs_parse, exprs_tag_parse
 from scheme_types.types import ScmSymbol
 
 
 class ParsingMode(Enum):
     READER = 0
     TAG_PARSER = 1
+    SEMANTIC_ANALYZER = 2
 
 
 class Env(dict):
@@ -268,6 +269,9 @@ def format_json(user_input, parsing_mode: ParsingMode = ParsingMode.READER):
     elif parsing_mode == ParsingMode.TAG_PARSER:
         expressions = exprs_parse(user_input)
         expression_trace = [trace_line_exp(exp) for exp in expressions]
+    elif parsing_mode == ParsingMode.SEMANTIC_ANALYZER:
+        expressions = exprs_tag_parse(user_input)
+        expression_trace = [trace_line_exp_tag(exp) for exp in expressions]
     else:
         raise ValueError(f"Unknown parsing mode: {parsing_mode}")
 

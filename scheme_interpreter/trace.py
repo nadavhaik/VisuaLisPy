@@ -229,8 +229,7 @@ def trace_line_exp(exp: Expr):
 
 
 def trace_enum(enum: Enum):
-    return str(enum)
-    # return make_node(enum.__class__.__name__, enum.name)
+    return str(enum.value)
 
 
 def trace_lexical_address(address: LexicalAddress):
@@ -241,27 +240,92 @@ def trace_lexical_address(address: LexicalAddress):
     elif isinstance(address, Bound):
         return f"Bound({address.major},{address.minor})"
 
-# ExprTag = ScmConstTag | ScmVarGetTag | ScmIfTag | ScmSeqTag | ScmOrTag | ScmVarSetTag | \
-#           ScmVarDefTag | ScmBoxTag | ScmBoxGetTag | ScmBoxSetTag | ScmLambdaTag | ScmApplicTag
-# class AppKind(Enum):
-#     Tail_Call = 0
-#     Non_Tail_Call = 1
-#
-#
-# @dataclass(eq=True)
-# class Free:
-#     pass
-#
-#
-# @dataclass(eq=True)
-# class Param:
-#     minor: int
-#
-#
-# @dataclass(eq=True)
-# class Bound:
-#     major: int
-#     minor: int
-#
-#
-# LexicalAddress = Free | Param | Bound
+
+def trace_var_tag(var_tag: ScmVarTag):
+    return make_node("var'", var_tag.name, trace_lexical_address(var_tag.lexical_address))
+
+
+def trace_scm_const_tag(const: ScmConstTag):
+    return make_node("ScmConst'", trace_sexp(const.sexpr))
+
+
+def trace_var_get_tag(var_get_tag: ScmVarGetTag):
+    return make_node("ScmVarGet'", trace_var_tag(var_get_tag.var))
+
+
+def trace_scm_if_tag(scm_if: ScmIfTag):
+    return make_node("ScmIf'", trace_expr_tag(scm_if.test), trace_expr_tag(scm_if.dit), trace_expr_tag(scm_if.dif))
+
+
+def trace_seq_tag(seq: ScmSeqTag):
+    return make_node("ScmSeq'", *[trace_expr_tag(exp) for exp in seq.exprs])
+
+
+def trace_or_tag(scm_or: ScmOrTag):
+    return make_node("ScmOr'", *[trace_expr_tag(exp) for exp in scm_or.exprs])
+
+
+def trace_var_set_tag(var_set: ScmVarSetTag):
+    return make_node("ScmVarSet'", trace_var_tag(var_set.var), trace_expr_tag(var_set.val))
+
+
+def trace_var_def_tag(var_def: ScmVarDefTag):
+    return make_node("ScmVarDef'", trace_var_tag(var_def.var), trace_expr_tag(var_def.val))
+
+
+def trace_scm_box_tag(box_tag: ScmBoxTag):
+    return make_node("ScmBox'", trace_var_tag(box_tag.var))
+
+
+def trace_scm_box_get_tag(box_get_tag: ScmBoxGetTag):
+    return make_node("ScmBoxGet'", trace_var_tag(box_get_tag.var))
+
+
+def trace_scm_box_set_tag(box_set_tag: ScmBoxSetTag):
+    return make_node("ScmBoxSet'", trace_var_tag(box_set_tag.var), trace_expr_tag(box_set_tag.val))
+
+
+def trace_lambda_tag(scm_lambda: ScmLambdaTag):
+    return make_node("ScmLambda'", trace_strings(scm_lambda.params), trace_lambda_kind(scm_lambda.kind),
+                     trace_expr_tag(scm_lambda.body))
+
+
+def trace_applic_tag(applic: ScmApplicTag):
+    return make_node("ScmApplic'", trace_expr_tag(applic.applicative), trace_exprs_tag(applic.params),
+                     trace_enum(applic.kind))
+
+
+def trace_exprs_tag(exprs: list[ExprTag]) -> NodeType:
+    return make_node("OcamlList", *[trace_expr_tag(exp) for exp in exprs])
+
+
+def trace_expr_tag(expr_tag: ExprTag) -> NodeType:
+    if isinstance(expr_tag, ScmConstTag):
+        return trace_scm_const_tag(expr_tag)
+    if isinstance(expr_tag, ScmVarGetTag):
+        return trace_var_get_tag(expr_tag)
+    if isinstance(expr_tag, ScmIfTag):
+        return trace_scm_if_tag(expr_tag)
+    if isinstance(expr_tag, ScmSeqTag):
+        return trace_seq_tag(expr_tag)
+    if isinstance(expr_tag, ScmOrTag):
+        return trace_or_tag(expr_tag)
+    if isinstance(expr_tag, ScmVarSetTag):
+        return trace_var_set_tag(expr_tag)
+    if isinstance(expr_tag, ScmVarDefTag):
+        return trace_var_def_tag(expr_tag)
+    if isinstance(expr_tag, ScmBoxTag):
+        return trace_scm_box_tag(expr_tag)
+    if isinstance(expr_tag, ScmBoxGetTag):
+        return trace_scm_box_get_tag(expr_tag)
+    if isinstance(expr_tag, ScmBoxSetTag):
+        return trace_scm_box_set_tag(expr_tag)
+    if isinstance(expr_tag, ScmLambdaTag):
+        return trace_lambda_tag(expr_tag)
+    if isinstance(expr_tag, ScmApplicTag):
+        return trace_applic_tag(expr_tag)
+    raise f"Unrecognized Expr': {expr_tag}"
+
+
+def trace_line_exp_tag(exp_tag: ExprTag):
+    return {"ROOT": trace_expr_tag(exp_tag)}
