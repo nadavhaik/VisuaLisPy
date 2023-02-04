@@ -229,7 +229,7 @@ def trace_line_exp(exp: Expr):
 
 
 def trace_enum(enum: Enum):
-    return str(enum.value)
+    return str(enum.name)
 
 
 def trace_lexical_address(address: LexicalAddress):
