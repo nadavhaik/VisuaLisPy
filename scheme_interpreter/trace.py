@@ -226,3 +226,42 @@ def trace_exp(exp: Expr) -> NodeType:
 
 def trace_line_exp(exp: Expr):
     return {"ROOT": trace_exp(exp)}
+
+
+def trace_enum(enum: Enum):
+    return str(enum)
+    # return make_node(enum.__class__.__name__, enum.name)
+
+
+def trace_lexical_address(address: LexicalAddress):
+    if isinstance(address, Free):
+        return "Free"
+    elif isinstance(address, Param):
+        return f"Param({address.minor})"
+    elif isinstance(address, Bound):
+        return f"Bound({address.major},{address.minor})"
+
+# ExprTag = ScmConstTag | ScmVarGetTag | ScmIfTag | ScmSeqTag | ScmOrTag | ScmVarSetTag | \
+#           ScmVarDefTag | ScmBoxTag | ScmBoxGetTag | ScmBoxSetTag | ScmLambdaTag | ScmApplicTag
+# class AppKind(Enum):
+#     Tail_Call = 0
+#     Non_Tail_Call = 1
+#
+#
+# @dataclass(eq=True)
+# class Free:
+#     pass
+#
+#
+# @dataclass(eq=True)
+# class Param:
+#     minor: int
+#
+#
+# @dataclass(eq=True)
+# class Bound:
+#     major: int
+#     minor: int
+#
+#
+# LexicalAddress = Free | Param | Bound

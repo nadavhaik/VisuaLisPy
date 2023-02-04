@@ -178,12 +178,7 @@ class Bound:
 LexicalAddress = Free | Param | Bound
 
 
-# let string_of_lexical_address: lexical_address -> string = function
-#     | Free -> "Free"
-#     | Param(x) -> Printf.sprintf "Param(%d)" x
-#     | Bound(x, y) -> Printf.sprintf "Bound(%d,%d)" x y;;
 #
-# type var' = Var' of string * lexical_address;;
 @dataclass(eq=True)
 class ScmVarTag:
     name: str
