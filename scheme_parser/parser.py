@@ -196,7 +196,7 @@ def convert_lexical_address(ocaml_lexical_address) -> LexicalAddress:
         case 'Param':
             return Param(ocaml_lexical_address.f0)
         case 'Bound':
-            return Bound(ocaml_lexical_address.f0[0], ocaml_lexical_address.f0[1])
+            return Bound(ocaml_lexical_address.f0, ocaml_lexical_address.f1)
         case _:
             raise f"Unrecognized address: {ocaml_lexical_address}"
 
