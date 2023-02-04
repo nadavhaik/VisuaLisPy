@@ -253,7 +253,7 @@ def convert_scm_box_get_tag(ocaml_scm_box_get_tag) -> ScmBoxGetTag:
 
 def convert_scm_box_set_tag(ocaml_scm_box_set_tag) -> ScmBoxSetTag:
     #   | ScmBoxSet' of var' * expr'
-    return ScmBoxSetTag(ocaml_scm_box_set_tag.f0, ocaml_scm_box_set_tag.f1)
+    return ScmBoxSetTag(convert_scm_var_tag(ocaml_scm_box_set_tag.f0), convert_expr_tag(ocaml_scm_box_set_tag.f1))
 
 
 def convert_scm_lambda_tag(ocaml_scm_lambda_tag) -> ScmLambdaTag:
