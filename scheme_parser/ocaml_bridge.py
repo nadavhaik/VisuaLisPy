@@ -39,8 +39,14 @@ class OcamlBridge:
     def exp_parser(self, string: str, index_from: int):
         return self.module.exp_parser(string, index_from)
 
+    def exp_tag_parser(self, string: str, index_from: int):
+        return self.module.exp_tag_parser(string, index_from)
+
     def sexprs_parser(self, string: str, index_from: int):
         return self.module.sexps_parser(string, index_from)
 
     def exprs_parser(self, string: str, index_from: int):
         return self.module.exps_parser(string, index_from)
+
+    def exps_tag_parser(self, string: str, index_from: int):
+        return self.module.exps_tag_parser(string, index_from)

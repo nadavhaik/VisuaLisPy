@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import TypeVar, Generic, Callable
+from enum import Enum
 
 from scheme_types.char import Char
 
@@ -30,6 +31,8 @@ class ScmNil:
     def __eq__(self, other):
         return type(self) == type(other)
 
+
+ProperList = tuple[T, "ProperList"] | ScmNil
 
 ScmBoolean = bool
 
@@ -150,4 +153,109 @@ class ScmApplic:
 
 Expr = ScmConst | ScmVarGet | ScmIf | ScmSeq | ScmOr | ScmVarSet | ScmVarDef | ScmLambda | ScmApplic
 
-ProperList = ScmNil | tuple[T, "ProperList"]
+
+class AppKind(Enum):
+    Tail_Call = 0
+    Non_Tail_Call = 1
+
+
+@dataclass(eq=True)
+class Free:
+    pass
+
+
+@dataclass(eq=True)
+class Param:
+    minor: int
+
+
+@dataclass(eq=True)
+class Bound:
+    major: int
+    minor: int
+
+
+LexicalAddress = Free | Param | Bound
+
+
+# let string_of_lexical_address: lexical_address -> string = function
+#     | Free -> "Free"
+#     | Param(x) -> Printf.sprintf "Param(%d)" x
+#     | Bound(x, y) -> Printf.sprintf "Bound(%d,%d)" x y;;
+#
+# type var' = Var' of string * lexical_address;;
+@dataclass(eq=True)
+class ScmVarTag:
+    name: str
+    lexical_address: LexicalAddress
+
+
+ScmConstTag = ScmConst
+
+
+@dataclass(eq=True)
+class ScmVarGetTag:
+    var: ScmVarTag
+
+
+@dataclass(eq=True)
+class ScmIfTag:
+    test: "ExprTag"
+    dit: "ExprTag"
+    dif: "ExprTag"
+
+
+@dataclass(eq=True)
+class ScmSeqTag:
+    exprs: list["ExprTag"]
+
+
+@dataclass(eq=True)
+class ScmOrTag:
+    exprs: list["ExprTag"]
+
+
+@dataclass(eq=True)
+class ScmVarSetTag:
+    var: ScmVarTag
+    val: "ExprTag"
+
+
+@dataclass(eq=True)
+class ScmVarDefTag:
+    var: ScmVarTag
+    val: "ExprTag"
+
+
+@dataclass(eq=True)
+class ScmBoxTag:
+    var: ScmVarTag
+
+
+@dataclass(eq=True)
+class ScmBoxGetTag:
+    var: ScmVarTag
+
+
+@dataclass(eq=True)
+class ScmBoxSetTag:
+    var: ScmVarTag
+    val: "ExprTag"
+
+
+@dataclass(eq=True)
+class ScmLambdaTag:
+    params: list[str]
+    kind: LambdaKind
+    body: "ExprTag"
+
+
+@dataclass(eq=True)
+class ScmApplicTag:
+    applicative: "ExprTag"
+    params: list["ExprTag"]
+    kind: AppKind
+
+
+ExprTag = ScmConstTag | ScmVarGetTag | ScmIfTag | ScmSeqTag | ScmOrTag | ScmVarSetTag | \
+          ScmVarDefTag | ScmBoxTag | ScmBoxGetTag | ScmBoxSetTag | ScmLambdaTag | ScmApplicTag

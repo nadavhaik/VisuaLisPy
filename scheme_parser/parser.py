@@ -22,6 +22,14 @@ def raw_parse_exprs(string: str):
     return OcamlBridge().exprs_parser(string, 0)
 
 
+def raw_parser_expr_tag(string: str):
+    return OcamlBridge().exp_tag_parser(string, 0)
+
+
+def raw_parser_exprs_tag(string: str):
+    return OcamlBridge().exps_tag_parser(string, 0)
+
+
 def convert_number(ocaml_scm_number) -> ScmNumber:
     match constructor_name(ocaml_scm_number):
         case "ScmRational":
@@ -177,6 +185,121 @@ def convert_expr(ocaml_exp) -> Expr:
             raise ValueError(f"Could not recognize expr {ocaml_exp}")
 
 
+def convert_app_kind(ocaml_app_kind) -> AppKind:
+    return AppKind[constructor_name(ocaml_app_kind)]
+
+
+def convert_lexical_address(ocaml_lexical_address) -> LexicalAddress:
+    match constructor_name(ocaml_lexical_address):
+        case 'Free':
+            return Free()
+        case 'Param':
+            return Param(ocaml_lexical_address.f0)
+        case 'Bound':
+            return Bound(ocaml_lexical_address.f0[0], ocaml_lexical_address.f0[1])
+        case _:
+            raise f"Unrecognized address: {ocaml_lexical_address}"
+
+
+# type var' = Var' of string * lexical_address;;
+def convert_scm_var_tag(ocaml_scm_var) -> ScmVarTag:
+    return ScmVarTag(ocaml_scm_var.f0.f0, ocaml_scm_var.f1)
+
+
+convert_scm_const_tag = convert_scm_const
+
+
+def convert_var_get_tag(ocaml_var_get_tag) -> ScmVarGetTag:
+    return ScmVarGetTag(convert_scm_var_tag(ocaml_var_get_tag.f0))
+
+
+def convert_scm_if_tag(ocaml_scm_if_tag) -> ScmIfTag:
+    #   | ScmIf' of expr' * expr' * expr'
+    return ScmIfTag(convert_expr_tag(ocaml_scm_if_tag.f0), convert_expr_tag(ocaml_scm_if_tag.f1),
+                    convert_expr_tag(ocaml_scm_if_tag.f2))
+
+
+def convert_scm_seq_tag(ocaml_scm_seq_tag) -> ScmSeqTag:
+    #   | ScmSeq' of expr' list
+    exprs = ocaml_scm_seq_tag.f0
+    return ScmSeqTag([convert_expr_tag(exp) for exp in exprs])
+
+
+def convert_scm_or_tag(ocaml_scm_or_tag) -> ScmOrTag:
+    #   | ScmOr' of expr' list
+    exprs = ocaml_scm_or_tag.f0
+    return ScmOrTag([convert_expr_tag(exp) for exp in exprs])
+
+
+def convert_scm_var_set_tag(ocaml_var_set_tag) -> ScmVarSetTag:
+    #   | ScmVarSet' of var' * expr'
+    return ScmVarSetTag(convert_scm_var_tag(ocaml_var_set_tag.f0), convert_expr_tag(ocaml_var_set_tag.f1))
+
+
+def convert_scm_var_def_tag(ocaml_var_def_tag) -> ScmVarDefTag:
+    #   | ScmVarDef' of var' * expr'
+    return ScmVarDefTag(convert_scm_var_tag(ocaml_var_def_tag.f0), convert_expr_tag(ocaml_var_def_tag.f1))
+
+
+def convert_scm_box_tag(ocaml_scm_box_tag) -> ScmBoxTag:
+    #   | ScmBox' of var'
+    return ScmBoxTag(convert_scm_var_tag(ocaml_scm_box_tag.f0))
+
+
+def convert_scm_box_get_tag(ocaml_scm_box_get_tag) -> ScmBoxGetTag:
+    #   | ScmBoxGet' of var'
+    return ScmBoxGetTag(convert_scm_var_tag(ocaml_scm_box_get_tag.f0))
+
+
+def convert_scm_box_set_tag(ocaml_scm_box_set_tag) -> ScmBoxSetTag:
+    #   | ScmBoxSet' of var' * expr'
+    return ScmBoxSetTag(ocaml_scm_box_set_tag.f0, ocaml_scm_box_set_tag.f1)
+
+
+def convert_scm_lambda_tag(ocaml_scm_lambda_tag) -> ScmLambdaTag:
+    #   | ScmLambda' of string list * lambda_kind * expr'
+    return ScmLambdaTag(list(ocaml_scm_lambda_tag.f0), convert_lambda_kind(ocaml_scm_lambda_tag.f1),
+                        convert_expr_tag(ocaml_scm_lambda_tag.f2))
+
+
+def convert_scm_applic_tag(ocaml_scm_applic) -> ScmApplicTag:
+    #   | ScmApplic' of expr' * expr' list * app_kind;;
+    return ScmApplicTag(convert_expr_tag(ocaml_scm_applic.f0),
+                        [convert_expr_tag(param) for param in ocaml_scm_applic.f1],
+                        convert_app_kind(ocaml_scm_applic.f1))
+
+
+def convert_expr_tag(ocaml_exp) -> ExprTag:
+    match constructor_name(ocaml_exp):
+        case "ScmConst'":
+            return convert_scm_const_tag(ocaml_exp)
+        case "ScmVarGet'":
+            return convert_var_get_tag(ocaml_exp)
+        case "ScmIf'":
+            return convert_scm_if_tag(ocaml_exp)
+        case "ScmSeq'":
+            return convert_scm_seq_tag(ocaml_exp)
+        case "ScmOr'":
+            return convert_scm_or_tag(ocaml_exp)
+        case "ScmVarSet'":
+            return convert_scm_var_set_tag(ocaml_exp)
+        case "ScmVarDef'":
+            return convert_scm_var_def_tag(ocaml_exp)
+        case "ScmBox'":
+            return convert_scm_box_tag(ocaml_exp)
+        case "ScmBoxGet'":
+            return convert_scm_box_get_tag(ocaml_exp)
+        case "ScmBoxSet'":
+            return convert_scm_box_set_tag(ocaml_exp)
+        case "ScmLambda'":
+            return convert_scm_lambda_tag(ocaml_exp)
+        case "ScmApplic'":
+            return convert_scm_applic_tag(ocaml_exp)
+        case _:
+            raise ValueError(
+                f"Could not recognize expr {ocaml_exp} with constructor name: {constructor_name(ocaml_exp)}")
+
+
 def sexp_parse(string: str) -> SExp:
     ocaml_result = raw_parse_sexp(string)
     return convert_sexp(ocaml_result.found)
@@ -197,9 +320,12 @@ def exprs_parse(string: str) -> list[Expr]:
     return [convert_expr(res) for res in results.found]
 
 
+def expr_tag_parse(string: str) -> ExprTag:
+    result = raw_parser_expr_tag(string)
+    return convert_expr_tag(result.found)
 
-# x = sexps_parse("(car (cons 1 2)) (define x 2)")
-# print(x)
-# print(sexps_parse("(letrec ((x 2) (y 3)) (+ x y))"))
-# print(sexps_parse("(lambda (x y z) x)"))
-# print(exprs_parse("(car (cons 1 2))"))
+
+def exprs_tag_parse(string: str) -> list[ExprTag]:
+    results = raw_parser_exprs_tag(string)
+    return [convert_expr_tag(res) for res in results.found]
+

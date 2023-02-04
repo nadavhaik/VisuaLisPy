@@ -338,6 +338,34 @@ type expr =
   | ScmLambda of string list * lambda_kind * expr
   | ScmApplic of expr * expr list;;
 
+type app_kind = Tail_Call | Non_Tail_Call;;
+
+type lexical_address =
+    | Free
+    | Param of int
+    | Bound of int * int;;
+  
+let string_of_lexical_address: lexical_address -> string = function
+    | Free -> "Free"
+    | Param(x) -> Printf.sprintf "Param(%d)" x
+    | Bound(x, y) -> Printf.sprintf "Bound(%d,%d)" x y;;
+  
+type var' = Var' of string * lexical_address;;
+  
+type expr' =
+  | ScmConst' of sexpr
+  | ScmVarGet' of var'
+  | ScmIf' of expr' * expr' * expr'
+  | ScmSeq' of expr' list
+  | ScmOr' of expr' list
+  | ScmVarSet' of var' * expr'
+  | ScmVarDef' of var' * expr'
+  | ScmBox' of var'
+  | ScmBoxGet' of var'
+  | ScmBoxSet' of var' * expr'
+  | ScmLambda' of string list * lambda_kind * expr'
+  | ScmApplic' of expr' * expr' list * app_kind;;
+
 module type PARSER = sig
   val nt_sexpr : sexpr PC.parser
   val print_sexpr : out_channel -> sexpr -> unit
@@ -350,7 +378,11 @@ module type PARSER = sig
   val print_exprs : out_channel -> expr list -> unit
   val sprint_expr : 'a -> expr -> string
   val sprint_exprs : 'a -> expr list -> string
-end;; (* end of READER signature *)
+  val annotate_lexical_address : expr -> expr'
+  val annotate_tail_calls : expr' -> expr'
+  val auto_box : expr' -> expr'
+  val semantics : expr -> expr'  
+end;; (* end of PARSER signature *)
 
 
 let rec string_of_sexpr = function
@@ -1213,11 +1245,285 @@ module Parser : PARSER = struct
     Printf.sprintf "[%s]"
       (String.concat "; "
          (List.map string_of_expr exprs));;
+  let rec lookup_in_rib name = function
+    | [] -> None
+    | name' :: rib ->
+      if name = name'
+      then Some(0)
+      else (match (lookup_in_rib name rib) with
+            | None -> None
+            | Some minor -> Some (minor + 1));;
+     
+  let rec lookup_in_env name = function
+    | [] -> None
+    | rib :: env ->
+      (match (lookup_in_rib name rib) with
+        | None ->
+          (match (lookup_in_env name env) with
+            | None -> None
+            | Some(major, minor) -> Some(major + 1, minor))
+        | Some minor -> Some(0, minor));;
+
+  let tag_lexical_address_for_var name params env = 
+    match (lookup_in_rib name params) with
+    | None ->
+      (match (lookup_in_env name env) with
+        | None -> Var' (name, Free)
+        | Some(major, minor) -> Var' (name, Bound (major, minor)))
+    | Some minor -> Var' (name, Param minor);;
+
+       (* run this first *)
+  let annotate_lexical_address =
+    let rec run expr params env =
+      match expr with
+      | ScmConst sexpr -> ScmConst' sexpr(*our code*)
+      | ScmVarGet (Var str) -> ScmVarGet' (tag_lexical_address_for_var str params env)(*our code*)
+      | ScmIf (test, dit, dif) -> ScmIf' ((run test params env),(run dit params env),(run dif params env))(*our code*)
+      | ScmSeq exprs -> ScmSeq' (List.map (fun expr -> run expr params env) exprs)(*our code*)
+      | ScmOr exprs -> ScmOr' (List.map (fun expr -> run expr params env) exprs)(*our code*)
+      | ScmVarSet(Var v, expr) -> ScmVarSet' ((tag_lexical_address_for_var v params env), (run expr params env))(*our code*)
+      (* this code does not [yet?] support nested define-expressions *)
+      | ScmVarDef(Var v, expr) -> ScmVarDef' ((tag_lexical_address_for_var v params env), (run expr params env))(*our code*)
+      | ScmLambda (params', Simple, expr) -> (*our code*)
+        let new_env = List.append [params] env in 
+        ScmLambda' (params', Simple,run expr params' new_env)
+      | ScmLambda (params', Opt opt, expr) -> (*our code*)
+        let new_env = List.append [params] env in 
+        let new_params = List.append params' [opt] in 
+        ScmLambda' (params', Simple,run expr new_params new_env)
+      | ScmApplic (proc, args) ->
+        ScmApplic' (run proc params env,
+                    List.map (fun arg -> run arg params env) args,
+                    Non_Tail_Call)
+    in
+    fun expr ->
+    run expr [] [];;
+    
+  (* run this second *)
+  let annotate_tail_calls = 
+    let rec run in_tail = fun x ->
+      let in_tail = false in
+      match x with
+      | (ScmConst' _) as orig -> orig(*our code*)
+      | (ScmVarGet' _) as orig -> orig(*our code*)
+      | ScmIf' (test, dit, dif) -> ScmIf' ((run false test),(run in_tail dit),(run in_tail dif))(*our code*)
+      | ScmSeq' [] -> ScmSeq' [](*our code*)
+      | ScmSeq' (expr :: exprs) -> ScmSeq' (runl in_tail expr exprs)(*our code*)
+      | ScmOr' [] -> ScmOr' [](*our code*)
+      | ScmOr' (expr :: exprs) -> ScmOr' (runl in_tail expr  exprs)(*our code*)
+      | ScmVarSet' (var', expr') -> ScmVarSet' (var', run false expr')(*our code*)
+      | ScmVarDef' (var', expr') -> ScmVarDef' (var', run false expr')(*our code*)
+      | (ScmBox' _) as expr' -> expr'(*our code*)
+      | (ScmBoxGet' _) as expr' -> expr'(*our code*)
+      | ScmBoxSet' (var', expr') ->  ScmBoxSet' (var' , run false expr')(*our code*)
+      | ScmLambda' (params, Simple, expr) -> ScmLambda' (params, Simple, run true expr)(*our code*)
+      | ScmLambda' (params, Opt opt, expr) -> ScmLambda' (params, Opt opt, run true expr)(*our code*)
+      | ScmApplic' (proc, args, app_kind) ->
+        if in_tail
+        then ScmApplic' (run false proc,
+                          List.map (fun arg -> run false arg) args,
+                          Tail_Call)
+        else ScmApplic' (run false proc,
+                          List.map (fun arg -> run false arg) args,
+                          Non_Tail_Call)
+    and runl in_tail expr = function
+      | [] -> [run in_tail expr]
+      | expr' :: exprs -> (run false expr) :: (runl in_tail expr' exprs)
+    in
+    fun expr' -> run false expr';; (*our code*)
+
+  (* auto_box *)
+
+  let copy_list = List.map (fun si -> si);;
+
+  let combine_pairs =
+    List.fold_left
+      (fun (rs1, ws1) (rs2, ws2) -> (rs1 @ rs2, ws1 @ ws2))
+      ([], []);;
+
+  let find_reads_and_writes =
+    let rec run name expr params env =
+      match expr with
+      | ScmConst' _ -> ([], [])
+      | ScmVarGet' (Var' (_, Free)) -> ([], [])
+      | ScmVarGet' (Var' (name', _) as v) ->
+        if name = name'
+        then ([(v, env)], [])
+        else ([], [])
+      | ScmBox' _ -> ([], [])
+      | ScmBoxGet' _ -> ([], [])
+      | ScmBoxSet' (_, expr) -> run name expr params env
+      | ScmIf' (test, dit, dif) ->
+        let (rs1, ws1) = (run name test params env) in
+        let (rs2, ws2) = (run name dit params env) in
+        let (rs3, ws3) = (run name dif params env) in
+        (rs1 @ rs2 @ rs3, ws1 @ ws2 @ ws3)
+      | ScmSeq' exprs ->
+        combine_pairs
+          (List.map
+              (fun expr -> run name expr params env)
+              exprs)
+      | ScmVarSet' (Var' (_, Free), expr) -> run name expr params env
+      | ScmVarSet' ((Var' (name', _) as v), expr) ->
+        let (rs1, ws1) =
+          if name = name'
+          then ([], [(v, env)])
+          else ([], []) in
+        let (rs2, ws2) = run name expr params env in
+        (rs1 @ rs2, ws1 @ ws2)
+      | ScmVarDef' (_, expr) -> run name expr params env
+      | ScmOr' exprs ->
+        combine_pairs
+          (List.map
+              (fun expr -> run name expr params env)
+              exprs)
+      | ScmLambda' (params', Simple, expr) ->
+        if (List.mem name params')
+        then ([], [])
+        else run name expr params' ((copy_list params) :: env)
+      | ScmLambda' (params', Opt opt, expr) ->
+        let params' = params' @ [opt] in
+        if (List.mem name params')
+        then ([], [])
+        else run name expr params' ((copy_list params) :: env)
+      | ScmApplic' (proc, args, app_kind) ->
+        let (rs1, ws1) = run name proc params env in
+        let (rs2, ws2) = 
+          combine_pairs
+            (List.map
+                (fun arg -> run name arg params env)
+                args) in
+        (rs1 @ rs2, ws1 @ ws2)
+    in
+    fun name expr params ->
+    run name expr params [];;
+
+  let cross_product as' bs' =
+    List.concat (List.map (fun ai ->
+                    List.map (fun bj -> (ai, bj)) bs')
+                  as');;
+
+  (*our code *)
+  let should_box_var name expr params = 
+    let read, write = find_reads_and_writes name expr params in
+    let readxwrite= cross_product read write in
+    List.exists (fun rw -> match rw with
+    | ((Var' (_, Param _), _), (Var' (_, Param _), _)) -> false
+    | ((Var' (_, Param _), _), _) | (_, (Var' (_, Param _), _)) -> true
+    | ((Var' (_, Bound (rm,_)), re),(Var' (_, Bound (wm,_)), we)) ->((List.nth re rm) != (List.nth we wm))) readxwrite 
+  (*our code*)
+
+  let box_sets_and_gets name body =
+    let rec run expr =
+      match expr with
+      | ScmConst' _ -> expr
+      | ScmVarGet' (Var' (_, Free)) -> expr
+      | ScmVarGet' (Var' (name', _) as v) ->
+        if name = name'
+        then ScmBoxGet' v
+        else expr
+      | ScmBox' _ -> expr
+      | ScmBoxGet' _ -> expr
+      | ScmBoxSet' (v, expr) -> ScmBoxSet' (v, run expr)
+      | ScmIf' (test, dit, dif) ->
+        ScmIf' (run test, run dit, run dif)
+      | ScmSeq' exprs -> ScmSeq' (List.map run exprs)
+      | ScmVarSet' (Var' (_, Free) as v, expr') ->
+        ScmVarSet'(v, run expr')
+      | ScmVarSet' (Var' (name', _) as v, expr') ->
+        if name = name'
+        then ScmBoxSet' (v, run expr')
+        else ScmVarSet' (v, run expr')
+      | ScmVarDef' (v, expr) -> ScmVarDef' (v, run expr)
+      | ScmOr' exprs -> ScmOr' (List.map run exprs)
+      | (ScmLambda' (params, Simple, expr)) as expr' ->
+        if List.mem name params
+        then expr'
+        else ScmLambda' (params, Simple, run expr)
+      | (ScmLambda' (params, Opt opt, expr)) as expr' ->
+        if List.mem name (params @ [opt])
+        then expr'
+        else ScmLambda' (params, Opt opt, run expr)
+      | ScmApplic' (proc, args, app_kind) ->
+        ScmApplic' (run proc, List.map run args, app_kind)
+    in
+    run body;;
+
+  let make_sets =
+    let rec run minor names params =
+      match names, params with
+      | [], _ -> []
+      | name :: names', param :: params' ->
+        if name = param
+        then let v = Var' (name, Param minor) in
+              (ScmVarSet' (v, ScmBox' v)) :: (run (minor + 1) names' params')
+        else run (minor + 1) names params'
+      | _, _ -> raise (X_this_should_not_happen
+                        "no free vars should be found here")
+    in
+    fun box_these params -> run 0 box_these params;;
+
+  let rec auto_box expr =
+    match expr with
+    | ScmConst' _ | ScmVarGet' _ | ScmBox' _ | ScmBoxGet' _ -> expr
+    | ScmBoxSet' (v, expr) -> ScmBoxSet' (v, auto_box expr)
+    | ScmIf' (test, dit, dif) ->
+      ScmIf' (auto_box test, auto_box dit, auto_box dif)
+    | ScmSeq' exprs -> ScmSeq' (List.map auto_box exprs)
+    | ScmVarSet' (v, expr) -> ScmVarSet' (v , auto_box expr)(*our code*)
+    | ScmVarDef' (v, expr) -> ScmVarDef' (v , auto_box expr)(*our code*)
+    | ScmOr' exprs -> ScmOr' (List.map auto_box exprs)(*our code*)
+    | ScmLambda' (params, Simple, expr') ->
+      let box_these =
+        List.filter
+          (fun param -> should_box_var param expr' params)
+          params in
+      let new_body = 
+        List.fold_left
+          (fun body name -> box_sets_and_gets name body)
+          (auto_box expr')
+          box_these in
+      let new_sets = make_sets box_these params in
+      let new_body = 
+        match box_these, new_body with
+        | [], _ -> new_body
+        | _, ScmSeq' exprs -> ScmSeq' (new_sets @ exprs)
+        | _, _ -> ScmSeq'(new_sets @ [new_body]) in
+      ScmLambda' (params, Simple, new_body)
+    | ScmLambda' (params, Opt opt, expr') ->(*our code*)
+        let box_these =
+          List.filter
+            (fun param -> should_box_var param expr' ([opt] @ params))
+            ([opt] @ params) in
+        let new_body = 
+          List.fold_left
+            (fun body name -> box_sets_and_gets name body)
+            (auto_box expr')
+            box_these in
+        let new_sets = make_sets box_these params in
+        let new_body = 
+          match box_these, new_body with
+          | [], _ -> new_body
+          | _, ScmSeq' exprs -> ScmSeq' (new_sets @ exprs)
+          | _, _ -> ScmSeq'(new_sets @ [new_body]) in
+        ScmLambda' (params, Simple, new_body)
+    | ScmApplic' (proc, args, app_kind) ->
+      ScmApplic' (auto_box proc, List.map auto_box args, app_kind);;
+
+  let semantics expr =
+    auto_box
+      (annotate_tail_calls
+        (annotate_lexical_address expr));;
 
 end;; (* end of struct Parser *)
 
 let sexp_parser = Parser.nt_sexpr;;
 let sexps_parser = PC.star sexp_parser;;
 let tag_parser = Parser.tag_parse;;
+
 let exp_parser = PC.pack sexp_parser tag_parser;;
 let exps_parser = PC.star exp_parser;;
+
+let semantics = Parser.semantics;;
+let exp_tag_parser = PC.pack exp_parser semantics;;
+let exps_tag_parser = PC.star exp_tag_parser;;
